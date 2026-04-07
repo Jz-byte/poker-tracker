@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>♠ Poker Bankroll Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;
+  --green:#3fb950;--green-dim:#1a3626;
+  --red:#f85149;--red-dim:#3d1a1a;
+  --gold:#d29922;--blue:#58a6ff;--purple:#bc8cff;--radius:10px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Header ── */
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+.logo{font-size:1.25rem;font-weight:700;letter-spacing:-.5px}.logo span{color:var(--gold)}
+.sync-badge{font-size:.75rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);display:flex;align-items:center;gap:6px}
+.sync-badge.saving{border-color:var(--gold);color:var(--gold)}
+.sync-badge.ok{border-color:var(--green);color:var(--green)}
+.sync-badge.err{border-color:var(--red);color:var(--red)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.sync-dot.spin{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Nav ── */
+nav{display:flex;gap:4px;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;overflow-x:auto}
+nav button{background:none;border:none;color:var(--muted);font-size:.9rem;padding:14px 16px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+nav button:hover{color:var(--text)}
+nav button.active{color:var(--blue);border-color:var(--blue)}
+
+main{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
+.page{display:none}.page.active{display:block}
+
+/* ── Cards / Panels ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px}
+.card h2{font-size:1rem;font-weight:600;margin-bottom:16px}
+
+/* ── Stats ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}
+.stat-card .label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.stat-card .value{font-size:1.75rem;font-weight:700;line-height:1}
+.stat-card .sub{font-size:.78rem;color:var(--muted);margin-top:4px}
+.pos{color:var(--green)}.neg{color:var(--red)}.neutral{color:var(--text)}
+
+/* ── Forms ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:.8rem;color:var(--muted)}
+input,select,textarea{background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.9rem;padding:9px 12px;outline:none;width:100%;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+textarea{resize:vertical;min-height:80px;font-family:inherit}
+select option{background:var(--bg3)}
+
+/* ── Buttons ── */
+.btn{border:none;border-radius:6px;font-size:.875rem;font-weight:600;padding:9px 18px;cursor:pointer;transition:opacity .15s}
+.btn:hover{opacity:.85}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-green{background:var(--green);color:#fff}
+.btn-red{background:var(--red);color:#fff}
+.btn-gold{background:var(--gold);color:#000}
+.btn-ghost{background:var(--bg3);border:1px solid var(--border);color:var(--text)}
+.btn-sm{padding:5px 12px;font-size:.8rem}
+
+/* ── Table ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+th{text-align:left;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg3)}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.75rem;font-weight:600}
+.badge-gold{background:#2e2007;color:var(--gold);border:1px solid var(--gold)}
+.badge-win{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+.badge-lose{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}
+
+/* ── Chips ── */
+.chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:.8rem;cursor:pointer;transition:border-color .15s,color .15s}
+.chip:hover,.chip.sel{border-color:var(--blue);color:var(--blue)}
+
+/* ── Toggle ── */
+.toggle-row{display:flex;gap:8px;margin-bottom:20px}
+.toggle-btn{flex:1;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--muted);font-size:.875rem;font-weight:600;cursor:pointer;transition:all .15s}
+.toggle-btn.win.active{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.toggle-btn.lose.active{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+
+/* ── Progress bar ── */
+.progress-bar{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;border-radius:3px;background:var(--green);transition:width .4s}
+
+/* ── Playing cards ── */
+.playing-card{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:44px;height:62px;border-radius:6px;font-weight:800;font-size:.95rem;line-height:1;cursor:pointer;user-select:none;transition:transform .1s,box-shadow .1s;position:relative}
+.playing-card.filled{background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.5)}
+.playing-card.filled:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.playing-card.filled.red{color:#d91a1a}.playing-card.filled.black{color:#1a1a1a}
+.playing-card.empty-slot{background:var(--bg3);border:2px dashed var(--border);color:var(--muted);font-size:1.3rem}
+.playing-card.empty-slot:hover{border-color:var(--blue);color:var(--blue)}
+.card-section{margin-bottom:20px}
+.card-section-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.card-section-inner{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ── Card Picker Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:520px;width:95%;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.modal-header h3{font-size:1rem;font-weight:600}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1}
+.modal-close:hover{color:var(--text)}
+.picker-suit-row{margin-bottom:10px}
+.picker-suit-label{font-size:.7rem;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.picker-cards{display:flex;gap:5px;flex-wrap:wrap}
+.picker-card{width:38px;height:52px;border-radius:5px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;cursor:pointer;border:2px solid transparent;transition:all .12s;flex-shrink:0}
+.picker-card.red{color:#d91a1a}.picker-card.black{color:#1a1a1a}
+.picker-card:hover:not(.used){transform:translateY(-3px);box-shadow:0 4px 12px rgba(0,0,0,.4);border-color:var(--blue)}
+.picker-card.used{opacity:.25;cursor:not-allowed;pointer-events:none}
+.picker-card.current-sel{border-color:var(--blue);background:#ddeeff}
+
+/* ── Street action ── */
+.street-block{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:10px}
+.street-block-header{font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.street-action-input{min-height:60px}
+
+/* ── Hand cards ── */
+.hand-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;position:relative}
+.hand-card .top{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.hand-card .amount{font-size:1.1rem;font-weight:700}
+.hand-card .hand-body{font-size:.875rem;color:var(--muted);line-height:1.6}
+.hand-card .del-btn{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;opacity:.5;transition:opacity .15s}
+.hand-card .del-btn:hover{opacity:1;color:var(--red)}
+.hand-card .meta{font-size:.75rem;color:var(--muted);margin-top:10px;display:flex;gap:16px;flex-wrap:wrap}
+.hand-streets{margin-top:12px}
+.street-entry{background:var(--bg2);border-radius:6px;padding:10px 12px;margin-bottom:6px}
+.street-entry .s-label{font-size:.7rem;color:var(--gold);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;font-weight:600;display:flex;align-items:center;gap:6px}
+.street-entry .s-text{font-size:.85rem;color:var(--muted)}
+.board-divider{width:1px;height:36px;background:var(--border);margin:0 6px}
+
+/* ── Misc overlays ── */
+.confirm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+.confirm-overlay.show{display:flex}
+.confirm-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;max-width:360px;width:90%;text-align:center}
+.confirm-box h3{margin-bottom:10px}
+.confirm-box p{color:var(--muted);font-size:.875rem;margin-bottom:20px}
+.confirm-box .btns{display:flex;gap:10px;justify-content:center}
+.chart-wrap{position:relative;height:260px}
+.empty{text-align:center;color:var(--muted);padding:48px 20px;font-size:.9rem}
+.empty .icon{font-size:2.5rem;margin-bottom:12px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.section-header h2{font-size:1rem;font-weight:600}
+
+/* ── Loading overlay ── */
+#loading-overlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+#loading-overlay.show{display:flex}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+.loading-msg{color:var(--muted);font-size:.9rem}
+
+/* ── Setup screen ── */
+#setup-overlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:600;overflow-y:auto;padding:40px 20px}
+#setup-overlay.show{display:block}
+.setup-box{max-width:680px;margin:0 auto}
+.setup-box h1{font-size:1.5rem;font-weight:700;margin-bottom:6px}
+.setup-box .sub-h{color:var(--muted);margin-bottom:32px;font-size:.9rem}
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:16px;display:flex;gap:16px}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-weight:700;font-size:.9rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-body h3{font-size:.95rem;font-weight:600;margin-bottom:6px}
+.step-body p{font-size:.85rem;color:var(--muted);line-height:1.6}
+.step-body a{color:var(--blue);text-decoration:none}
+.step-body a:hover{text-decoration:underline}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-top:10px;font-family:monospace;font-size:.8rem;color:var(--text);position:relative;white-space:pre-wrap;word-break:break-all}
+.copy-btn{position:absolute;top:8px;right:8px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);font-size:.7rem;padding:3px 8px;cursor:pointer}
+.copy-btn:hover{color:var(--text)}
+.url-row{display:flex;gap:10px;margin-top:12px}
+.url-row input{flex:1}
+.migrate-banner{background:var(--green-dim);border:1px solid var(--green);border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:.875rem}
+.migrate-banner strong{color:var(--green)}
+
+@media(max-width:600px){
+  header{padding:0 14px}nav{padding:0 10px}main{padding:18px 12px 60px}
+  .stat-card .value{font-size:1.4rem}
+  .step-card{flex-direction:column;gap:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ── SETUP OVERLAY ── -->
+<div id="setup-overlay">
+<div class="setup-box">
+  <h1>♠ Connect to Google Sheets</h1>
+  <p class="sub-h">Your data will live in a Google Sheet in your Drive — accessible from any browser, any device, as long as you're signed into Google.</p>
+
+  <div id="migrate-banner" class="migrate-banner" style="display:none">
+    <strong>📦 Local data found!</strong> We detected sessions/hands saved locally in this browser.
+    After connecting, click <strong>"Import existing data"</strong> below to move everything to Sheets.
+  </div>
+
+  <!-- Step 1 -->
+  <div class="step-card">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <h3>Open Google Apps Script</h3>
+      <p>Go to <a href="https://script.google.com" target="_blank">script.google.com</a> and click <strong>+ New project</strong> (top-left).</p>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step-card">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <h3>Paste the backend code</h3>
+      <p>Delete everything in the code editor, then paste the contents of <code>poker-backend.js</code> (in the same folder as this file).</p>
+      <p style="margin-top:8px">Save the project — name it <em>Poker Tracker</em>.</p>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step-card">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <h3>Deploy as a Web App</h3>
+      <p>
+        Click <strong>Deploy → New deployment</strong>.<br>
+        Click the ⚙ gear icon next to <em>Type</em> → select <strong>Web app</strong>.<br>
+        Set <strong>Execute as:</strong> Me<br>
+        Set <strong>Who has access:</strong> Anyone<br>
+        Click <strong>Deploy</strong> → authorize your Google account → copy the URL.
+      </p>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step-card">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <h3>Paste your Web App URL here</h3>
+      <p>The URL looks like: <em>https://script.google.com/macros/s/AKfyc…/exec</em></p>
+      <div class="url-row">
+        <input type="url" id="setup-url" placeholder="https://script.google.com/macros/s/…/exec" />
+        <button class="btn btn-primary" onclick="testAndConnect()">Connect →</button>
+      </div>
+      <div id="setup-status" style="font-size:.8rem;margin-top:8px;color:var(--muted)"></div>
+      <div id="setup-tip" style="display:none;margin-top:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:.82rem;line-height:1.7">
+        <strong style="color:var(--gold)">Troubleshooting checklist:</strong><br>
+        1. Make sure you replaced <strong>all</strong> the Apps Script code with the new <code>poker-backend.js</code><br>
+        2. After updating the code, go to <strong>Deploy → Manage deployments → ✏️ Edit → New version → Deploy</strong><br>
+        3. Use the same URL — it doesn't change when you redeploy<br>
+        4. You can verify the script works by
+        <a id="test-url-link" href="#" target="_blank" onclick="openTestUrl(event)" style="color:var(--blue)">clicking here to test it directly in a new tab</a>
+        — you should see <code style="color:var(--green)">{"ok":true,...}</code>
+      </div>
+    </div>
+  </div>
+
+  <div id="import-section" style="display:none;margin-top:8px">
+    <button class="btn btn-green" onclick="importFromLocalStorage()">📦 Import existing data from this browser</button>
+    <span style="font-size:.8rem;color:var(--muted);margin-left:12px">Found <span id="import-count"></span> sessions and hands</span>
+  </div>
+
+  <p style="font-size:.75rem;color:var(--muted);margin-top:24px">
+    ℹ️ A Google Sheet named "Poker Tracker Data" will be created automatically in your Google Drive.
+    You can view and edit it directly. The URL above is your private key — keep it safe.
+  </p>
+</div>
+</div>
+
+<!-- ── LOADING OVERLAY ── -->
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Connecting to Google Sheets…</div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<header>
+  <div class="logo">♠ <span>Poker</span> Tracker</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div id="header-bankroll" style="font-size:.8rem;color:var(--muted)"></div>
+    <div id="sync-badge" class="sync-badge ok"><span class="sync-dot"></span><span id="sync-text">Synced</span></div>
+    <button class="btn btn-ghost btn-sm" onclick="disconnectSheets()" title="Change Sheets URL">⚙</button>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showPage('dashboard',this)">📊 Dashboard</button>
+  <button onclick="showPage('sessions',this)">🃏 Sessions</button>
+  <button onclick="showPage('hands',this)">✋ Hand History</button>
+  <button onclick="showPage('analytics',this)">📈 Analytics</button>
+</nav>
+
+<main>
+
+<!-- ── DASHBOARD ── -->
+<div id="page-dashboard" class="page active">
+  <div id="recovery-banner" style="display:none;background:var(--green-dim);border:1px solid var(--green);border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div>
+      <strong style="color:var(--green)">📦 Local backup found!</strong>
+      <span style="font-size:.85rem;color:var(--muted);margin-left:8px" id="recovery-count"></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-green btn-sm" onclick="recoverLocalData()">Import to Sheets</button>
+      <button class="btn btn-ghost btn-sm" onclick="dismissRecovery()">Dismiss</button>
+    </div>
+  </div>
+  <div class="stat-grid" id="stat-grid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px">
+    <div class="card"><h2>Recent Sessions</h2><div id="recent-sessions-list"></div></div>
+    <div class="card"><h2>Memorable Hands</h2><div id="recent-hands-list"></div></div>
+  </div>
+  <div class="card">
+    <h2>Bankroll Over Time</h2>
+    <div class="chart-wrap"><canvas id="dash-chart"></canvas></div>
+  </div>
+</div>
+
+<!-- ── SESSIONS ── -->
+<div id="page-sessions" class="page">
+  <div class="card" style="margin-bottom:20px">
+    <h2>Log New Session</h2>
+    <div style="margin-bottom:12px">
+      <label style="display:block;margin-bottom:8px">Stake Preset</label>
+      <div class="chip-row" id="stake-presets">
+        <div class="chip" onclick="selectStake('1/2')">1/2</div>
+        <div class="chip" onclick="selectStake('1/3')">1/3</div>
+        <div class="chip" onclick="selectStake('2/5')">2/5</div>
+        <div class="chip" onclick="selectStake('5/10')">5/10</div>
+        <div class="chip" onclick="selectStake('10/20')">10/20</div>
+        <div class="chip" onclick="selectStake('25/50')">25/50</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Stake</label><input type="text" id="s-stake" placeholder="1/3"/></div>
+      <div class="field"><label>Buy-in ($)</label><input type="number" id="s-buyin" placeholder="500"/></div>
+      <div class="field"><label>Cash-out ($)</label><input type="number" id="s-cashout" placeholder="850"/></div>
+      <div class="field"><label>Hours Played</label><input type="number" id="s-hours" placeholder="5" step="0.5"/></div>
+      <div class="field"><label>Location / Casino</label><input type="text" id="s-location" placeholder="Bellagio"/></div>
+      <div class="field"><label>Date</label><input type="date" id="s-date"/></div>
+    </div>
+    <div class="field" style="margin-bottom:16px">
+      <label>Notes (optional)</label>
+      <textarea id="s-notes" placeholder="How did the session go?"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn btn-primary" id="log-session-btn" onclick="logSession()">+ Log Session</button>
+      <div id="s-preview" style="font-size:.875rem;color:var(--muted)"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-header"><h2>Session History</h2><span id="session-count" style="font-size:.8rem;color:var(--muted)"></span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Stake</th><th>Location</th><th>Buy-in</th><th>Cash-out</th><th>Result</th><th>Hours</th><th>$/hr</th><th></th></tr></thead>
+        <tbody id="sessions-tbody"></tbody>
+      </table>
+      <div id="sessions-empty" class="empty" style="display:none"><div class="icon">🃏</div>No sessions yet. Log your first session above!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HANDS ── -->
+<div id="page-hands" class="page">
+  <div class="card" style="margin-bottom:20px">
+    <h2>Log Memorable Hand</h2>
+    <div class="toggle-row">
+      <button class="toggle-btn win active" id="hand-type-win" onclick="selectHandType('win')">🏆 Winning Hand</button>
+      <button class="toggle-btn lose" id="hand-type-lose" onclick="selectHandType('lose')">💔 Losing Hand</button>
+    </div>
+    <div class="form-grid" style="margin-bottom:20px">
+      <div class="field"><label>Amount Won / Lost ($)</label><input type="number" id="h-amount" placeholder="350"/></div>
+      <div class="field"><label>Stake</label><input type="text" id="h-stake" placeholder="1/3"/></div>
+      <div class="field"><label>Date</label><input type="date" id="h-date"/></div>
+      <div class="field"><label>Villain / Key Player</label><input type="text" id="h-villain" placeholder="LAG reg in seat 5"/></div>
+    </div>
+
+    <!-- Cards -->
+    <div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:14px">🂠 Your Hole Cards</div>
+      <div class="card-section">
+        <div class="card-section-label">Your Hand (pick 2)</div>
+        <div class="card-section-inner" id="hole-slots"></div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+        <div style="font-size:.85rem;font-weight:600;margin-bottom:14px">Board</div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap">
+          <div class="card-section"><div class="card-section-label">Flop (3 cards)</div><div class="card-section-inner" id="flop-slots"></div></div>
+          <div class="card-section"><div class="card-section-label">Turn</div><div class="card-section-inner" id="turn-slots"></div></div>
+          <div class="card-section"><div class="card-section-label">River</div><div class="card-section-inner" id="river-slots"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Street action -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:.85rem;font-weight:600;margin-bottom:12px">⚡ Action by Street</div>
+      <div class="street-block">
+        <div class="street-block-header">Preflop</div>
+        <textarea class="street-action-input" id="a-preflop" placeholder="e.g. UTG raises to $12, Hero 3-bets to $38 with A♠K♠, BTN calls, UTG folds..."></textarea>
+      </div>
+      <div class="street-block">
+        <div class="street-block-header">Flop <span id="flop-action-label" style="display:flex;gap:3px"></span></div>
+        <textarea class="street-action-input" id="a-flop" placeholder="e.g. Hero bets $55 into $82, BTN raises to $145..."></textarea>
+      </div>
+      <div class="street-block">
+        <div class="street-block-header">Turn <span id="turn-action-label" style="display:flex;gap:3px"></span></div>
+        <textarea class="street-action-input" id="a-turn" placeholder="e.g. Hero checks, BTN bets $120, Hero calls..."></textarea>
+      </div>
+      <div class="street-block">
+        <div class="street-block-header">River <span id="river-action-label" style="display:flex;gap:3px"></span></div>
+        <textarea class="street-action-input" id="a-river" placeholder="e.g. Hero shoves $380, BTN calls..."></textarea>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Hand Summary / Context (optional)</label>
+      <textarea id="h-desc" placeholder="Table dynamics, reads, why you made your decisions..."></textarea>
+    </div>
+    <div class="field" style="margin-bottom:20px">
+      <label>Lesson / Reflection (optional)</label>
+      <textarea id="h-lesson" placeholder="What did you learn? What would you do differently?" style="min-height:60px"></textarea>
+    </div>
+    <button class="btn btn-primary" id="log-hand-btn" onclick="logHand()">+ Save Hand</button>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="chip sel" id="filter-all" onclick="filterHands('all')">All Hands</button>
+    <button class="chip" id="filter-win" onclick="filterHands('win')">🏆 Wins</button>
+    <button class="chip" id="filter-lose" onclick="filterHands('lose')">💔 Losses</button>
+  </div>
+  <div id="hands-list"></div>
+  <div id="hands-empty" class="empty" style="display:none"><div class="icon">✋</div>No hands saved yet!</div>
+</div>
+
+<!-- ── ANALYTICS ── -->
+<div id="page-analytics" class="page">
+  <div class="stat-grid" id="analytics-stats"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+    <div class="card"><h2>Profit / Loss Over Time</h2><div class="chart-wrap"><canvas id="pl-chart"></canvas></div></div>
+    <div class="card"><h2>Results by Stake</h2><div class="chart-wrap"><canvas id="stake-chart"></canvas></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+    <div class="card"><h2>Session Duration</h2><div class="chart-wrap"><canvas id="duration-chart"></canvas></div></div>
+    <div class="card"><h2>Win / Loss Split</h2><div class="chart-wrap"><canvas id="winloss-chart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <h2>Performance by Location</h2>
+    <div id="location-empty" class="empty" style="display:none"><div class="icon">📍</div>No location data yet.</div>
+    <div class="table-wrap" id="location-table-content">
+      <table><thead><tr><th>Location</th><th>Sessions</th><th>Total Profit</th><th>Avg Result</th><th>Win Rate</th></tr></thead>
+      <tbody id="location-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ── CARD PICKER MODAL ── -->
+<div class="modal-overlay" id="card-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="card-modal-title">Pick a Card</h3>
+      <button class="modal-close" onclick="closeCardModal()">×</button>
+    </div>
+    <div id="card-grid-content"></div>
+  </div>
+</div>
+
+<!-- ── CONFIRM OVERLAY ── -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Delete this entry?</h3>
+    <p>This action cannot be undone.</p>
+    <div class="btns">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-red" id="confirm-yes">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   DATA LAYER
+   ═══════════════════════════════════════════════════════ */
+
+let SCRIPT_URL = localStorage.getItem('pk_script_url') || '';
+
+// In-memory store (populated from Sheets on load)
+let store = { sessions: [], hands: [], bankroll: 0 };
+
+/* ── JSONP helper — works from file:// with no CORS issues ── */
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_pk' + Date.now() + Math.random().toString(36).slice(2);
+    const script = document.createElement('script');
+    const timer  = setTimeout(() => { cleanup(); reject(new Error('Request timed out after 30s')); }, 30000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = data => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error('Could not reach the Apps Script URL. Make sure it ends in /exec')); };
+    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+    document.head.appendChild(script);
+  });
+}
+
+/* ── API helpers ── */
+async function api(action, params = {}) {
+  let url = SCRIPT_URL + '?action=' + encodeURIComponent(action);
+  if (params.id)   url += '&id='   + encodeURIComponent(params.id);
+  if (params.data) url += '&data=' + encodeURIComponent(JSON.stringify(params.data));
+  const json = await jsonp(url);
+  if (!json.ok) throw new Error(json.error || 'Unknown error');
+  return json;
+}
+
+function setSaving(){ setSyncBadge('saving','Saving…',true) }
+function setSaved(){  setSyncBadge('ok','Synced ✓',false) }
+function setSyncErr(){ setSyncBadge('err','Sync error — retry',false) }
+function setSyncBadge(cls,txt,spin){
+  const b=$('sync-badge'); const d=b.querySelector('.sync-dot'); const t=$('sync-text');
+  b.className='sync-badge '+cls; t.textContent=txt;
+  d.classList.toggle('spin',spin);
+}
+
+/* ═══════════════════════════════════════════════════════
+   SETUP & CONNECTION
+   ═══════════════════════════════════════════════════════ */
+
+function checkMigrationData(){
+  const s = JSON.parse(localStorage.getItem('pk_sessions')||'[]');
+  const h = JSON.parse(localStorage.getItem('pk_hands')||'[]');
+  const count = s.length + h.length;
+  if(count > 0){
+    $('migrate-banner').style.display = 'block';
+    $('import-count').textContent = `${s.length} session${s.length!==1?'s':''} and ${h.length} hand${h.length!==1?'s':''}`;
+    $('import-section').style.display = 'block';
+  }
+}
+
+async function testAndConnect(){
+  const url = $('setup-url').value.trim();
+  if(!url){
+    setSetupStatus('⚠ Please paste your Web App URL first','var(--red)'); return;
+  }
+  if(!url.includes('script.google.com')){
+    setSetupStatus('⚠ URL should come from script.google.com — did you copy the right thing?','var(--red)'); return;
+  }
+  if(!url.includes('/exec')){
+    setSetupStatus('⚠ URL should end in /exec — looks like you may have pasted the Deployment ID instead of the URL','var(--red)'); return;
+  }
+
+  SCRIPT_URL = url;
+  localStorage.setItem('pk_script_url', url);
+  setSetupStatus('Connecting…','var(--muted)');
+
+  try {
+    const data = await api('getAll');
+    setSetupStatus('✓ Connected!','var(--green)');
+    setTimeout(() => { $('setup-overlay').classList.remove('show'); startApp(data); }, 500);
+  } catch(e){
+    SCRIPT_URL = ''; localStorage.removeItem('pk_script_url');
+    setSetupStatus('✗ ' + e.message + ' — see tip below','var(--red)');
+    $('setup-tip').style.display = 'block';
+  }
+}
+function setSetupStatus(msg,color){ $('setup-status').textContent=msg; $('setup-status').style.color=color; }
+
+function openTestUrl(e){
+  e.preventDefault();
+  const url = $('setup-url').value.trim();
+  if(!url){ alert('Paste your URL first'); return; }
+  window.open(url + '?action=getAll', '_blank');
+}
+
+async function importFromLocalStorage(){
+  const sessions = JSON.parse(localStorage.getItem('pk_sessions')||'[]');
+  const hands    = JSON.parse(localStorage.getItem('pk_hands')||'[]');
+  const bankroll = parseFloat(localStorage.getItem('pk_bankroll')||'0');
+  if(!sessions.length && !hands.length){ setSetupStatus('No data found to import.','var(--muted)'); return; }
+  setSetupStatus('Importing…','var(--muted)');
+  try {
+    await api('importAll', { data: { sessions, hands, bankroll } });
+    setSetupStatus(`✓ Imported ${sessions.length} sessions and ${hands.length} hands to Sheets!`, 'var(--green)');
+    // Clear localStorage now that data is in Sheets
+    localStorage.removeItem('pk_sessions');
+    localStorage.removeItem('pk_hands');
+    localStorage.removeItem('pk_bankroll');
+    $('import-section').style.display = 'none';
+    $('migrate-banner').style.display = 'none';
+  } catch(e){
+    setSetupStatus('✗ Import failed: ' + e.message, 'var(--red)');
+  }
+}
+
+function disconnectSheets(){
+  if(!confirm('Change the Google Sheets connection?\nThis will show the setup screen again.')) return;
+  localStorage.removeItem('pk_script_url');
+  location.reload();
+}
+
+/* ═══════════════════════════════════════════════════════
+   APP BOOT
+   ═══════════════════════════════════════════════════════ */
+
+async function boot(){
+  if(!SCRIPT_URL){
+    $('setup-overlay').classList.add('show');
+    checkMigrationData();
+    return;
+  }
+  showLoading('Connecting to Google Sheets…');
+  try {
+    const data = await api('getAll');
+    hideLoading();
+    startApp(data);
+  } catch(e){
+    hideLoading();
+    // Fallback to cached localStorage if offline
+    const cachedSessions = JSON.parse(localStorage.getItem('pk_sessions_cache')||'[]');
+    const cachedHands    = JSON.parse(localStorage.getItem('pk_hands_cache')||'[]');
+    const cachedBankroll = parseFloat(localStorage.getItem('pk_bankroll')||'0');
+    if(cachedSessions.length || cachedHands.length){
+      setSyncErr();
+      startApp({ sessions: cachedSessions, hands: cachedHands, bankroll: cachedBankroll });
+      alert('Could not reach Google Sheets. Showing cached data. Check your connection.');
+    } else {
+      setSyncErr();
+      alert('Could not connect to Google Sheets: ' + e.message + '\n\nCheck your Script URL in ⚙.');
+      startApp({ sessions: [], hands: [], bankroll: 0 });
+    }
+  }
+}
+
+function checkLocalRecovery(){
+  const s = JSON.parse(localStorage.getItem('pk_sessions') || '[]');
+  const h = JSON.parse(localStorage.getItem('pk_hands')    || '[]');
+  if(!s.length && !h.length) return;
+  const banner = $('recovery-banner');
+  $('recovery-count').textContent = `${s.length} session${s.length!==1?'s':''} and ${h.length} hand${h.length!==1?'s':''} from your previous local version`;
+  banner.style.display = 'flex';
+}
+
+async function recoverLocalData(){
+  const sessions  = JSON.parse(localStorage.getItem('pk_sessions')  || '[]');
+  const hands     = JSON.parse(localStorage.getItem('pk_hands')     || '[]');
+  const bankroll  = parseFloat(localStorage.getItem('pk_bankroll')  || '0');
+  if(!sessions.length && !hands.length){ dismissRecovery(); return; }
+  setSaving();
+  try {
+    const r = await api('importAll', { data: { sessions, hands, bankroll } });
+    // Clear old localStorage keys
+    localStorage.removeItem('pk_sessions');
+    localStorage.removeItem('pk_hands');
+    localStorage.removeItem('pk_bankroll');
+    dismissRecovery();
+    // Reload fresh data from Sheets
+    const fresh = await api('getAll');
+    startApp(fresh);
+    setSaved();
+  } catch(e){
+    setSyncErr();
+    alert('Import failed: ' + e.message);
+  }
+}
+
+function dismissRecovery(){
+  $('recovery-banner').style.display = 'none';
+  localStorage.removeItem('pk_sessions');
+  localStorage.removeItem('pk_hands');
+}
+
+function startApp(data){
+  store.sessions  = (data.sessions || []).sort((a,b) => b.createdAt - a.createdAt);
+  store.hands     = (data.hands    || []).sort((a,b) => b.createdAt - a.createdAt);
+  store.bankroll  = data.bankroll  || 0;
+  // Cache locally for offline fallback
+  localStorage.setItem('pk_sessions_cache', JSON.stringify(store.sessions));
+  localStorage.setItem('pk_hands_cache',    JSON.stringify(store.hands));
+  localStorage.setItem('pk_bankroll',       String(store.bankroll));
+  renderAll();
+  setSaved();
+}
+
+function showLoading(msg){ $('loading-msg').textContent=msg; $('loading-overlay').classList.add('show'); }
+function hideLoading(){ $('loading-overlay').classList.remove('show'); }
+
+/* ═══════════════════════════════════════════════════════
+   CARD PICKER STATE
+   ═══════════════════════════════════════════════════════ */
+
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const SUITS = [
+  {sym:'♠',name:'Spades',  color:'black'},
+  {sym:'♥',name:'Hearts',  color:'red'},
+  {sym:'♦',name:'Diamonds',color:'red'},
+  {sym:'♣',name:'Clubs',   color:'black'},
+];
+function cardColor(s){ return (s==='♥'||s==='♦')?'red':'black'; }
+
+let pickerTarget=null, pickerSlotIndex=null;
+let cardSel = { hole:[null,null], flop:[null,null,null], turn:[null], river:[null] };
+
+let handType='win', handFilter='all';
+let charts={};
+
+/* ═══════════════════════════════════════════════════════
+   UTILS
+   ═══════════════════════════════════════════════════════ */
+
+const $ = id => document.getElementById(id);
+const fmt = n => { const a=Math.abs(n).toLocaleString(); return (n>=0?'+$':'-$')+a; };
+const fmtMoney = n => '$'+Math.abs(n).toLocaleString();
+const fmtDate  = d => {
+  if (!d) return '—';
+  // Handle both "2026-01-03" and full Date.toString() strings
+  const date = (typeof d === 'string' && d.length <= 10)
+    ? new Date(d + 'T12:00:00')
+    : new Date(d);
+  return isNaN(date) ? '—' : date.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+};
+const today    = () => new Date().toISOString().split('T')[0];
+const uid      = () => Date.now().toString(36)+Math.random().toString(36).slice(2);
+
+function miniCardHTML(c,w='34px',h='46px'){
+  const col=cardColor(c.suit);
+  return `<span style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+    width:${w};height:${h};border-radius:3px;background:#fff;color:${col==='red'?'#d91a1a':'#1a1a1a'};
+    font-weight:800;font-size:.65rem;box-shadow:0 1px 3px rgba(0,0,0,.4);flex-shrink:0">
+    <span>${c.rank}</span><span>${c.suit}</span></span>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAVIGATION
+   ═══════════════════════════════════════════════════════ */
+
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  $('page-'+name).classList.add('active'); btn.classList.add('active');
+  if(name==='analytics') renderAnalytics();
+  if(name==='dashboard') renderDashboard();
+}
+
+/* ═══════════════════════════════════════════════════════
+   CARD SLOTS
+   ═══════════════════════════════════════════════════════ */
+
+function renderCardSlots(){
+  renderSlotsFor('hole-slots','hole',2);
+  renderSlotsFor('flop-slots','flop',3);
+  renderSlotsFor('turn-slots','turn',1);
+  renderSlotsFor('river-slots','river',1);
+  updateStreetLabels();
+}
+function renderSlotsFor(cid,target,max){
+  const el=$(cid); if(!el) return;
+  let html='';
+  for(let i=0;i<max;i++){
+    const c=cardSel[target][i];
+    if(c){ html+=`<div class="playing-card filled ${cardColor(c.suit)}" onclick="openCardModal('${target}',${i})"><span>${c.rank}</span><span>${c.suit}</span></div>`; }
+    else  { html+=`<div class="playing-card empty-slot" onclick="openCardModal('${target}',${i})">+</div>`; }
+  }
+  if(cardSel[target].some(Boolean)) html+=`<button class="btn btn-ghost btn-sm" style="height:62px" onclick="clearSlot('${target}')">✕</button>`;
+  el.innerHTML=html;
+}
+function clearSlot(t){ cardSel[t]=Array(cardSel[t].length).fill(null); renderCardSlots(); }
+function updateStreetLabels(){
+  $('flop-action-label').innerHTML  = cardSel.flop.filter(Boolean).map(c=>miniCardHTML(c,'22px','30px')).join('');
+  $('turn-action-label').innerHTML  = cardSel.turn[0]  ? miniCardHTML(cardSel.turn[0],'22px','30px')  : '';
+  $('river-action-label').innerHTML = cardSel.river[0] ? miniCardHTML(cardSel.river[0],'22px','30px') : '';
+}
+
+function openCardModal(target,idx){
+  pickerTarget=target; pickerSlotIndex=idx;
+  const labels={hole:'Hole Cards',flop:'Flop',turn:'Turn',river:'River'};
+  $('card-modal-title').textContent='Pick a Card — '+labels[target];
+  renderCardGrid(); $('card-modal').classList.add('show');
+}
+function closeCardModal(){ $('card-modal').classList.remove('show'); }
+function renderCardGrid(){
+  const used=[...cardSel.hole,...cardSel.flop,...cardSel.turn,...cardSel.river].filter(Boolean).map(c=>c.rank+c.suit);
+  const cur=cardSel[pickerTarget][pickerSlotIndex]; const curId=cur?cur.rank+cur.suit:null;
+  $('card-grid-content').innerHTML=SUITS.map(suit=>`
+    <div class="picker-suit-row">
+      <div class="picker-suit-label">${suit.sym} ${suit.name}</div>
+      <div class="picker-cards">${RANKS.map(rank=>{
+        const id=rank+suit.sym, isUsed=used.includes(id)&&id!==curId;
+        return `<div class="picker-card ${suit.color} ${isUsed?'used':''} ${id===curId?'current-sel':''}" onclick="pickCard('${rank}','${suit.sym}')">
+          <span class="pk-rank">${rank}</span><span class="pk-suit">${suit.sym}</span></div>`;
+      }).join('')}</div></div>`).join('');
+}
+function pickCard(rank,suit){
+  cardSel[pickerTarget][pickerSlotIndex]={rank,suit};
+  closeCardModal(); renderCardSlots();
+}
+
+/* ═══════════════════════════════════════════════════════
+   SESSIONS
+   ═══════════════════════════════════════════════════════ */
+
+function selectStake(v){
+  $('s-stake').value=v;
+  document.querySelectorAll('#stake-presets .chip').forEach(c=>c.classList.toggle('sel',c.textContent===v));
+  updatePreview();
+}
+function updatePreview(){
+  const bi=parseFloat($('s-buyin').value)||0, co=parseFloat($('s-cashout').value)||0;
+  if(bi&&co){ const p=co-bi; $('s-preview').innerHTML=`Result: <strong style="color:${p>=0?'var(--green)':'var(--red)'}">${fmt(p)}</strong>`; }
+  else $('s-preview').textContent='';
+}
+['s-buyin','s-cashout'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('input',updatePreview); });
+
+async function logSession(){
+  const stake=$('s-stake').value.trim(), buyin=parseFloat($('s-buyin').value), cashout=parseFloat($('s-cashout').value);
+  const hours=parseFloat($('s-hours').value)||null, location=$('s-location').value.trim();
+  const date=$('s-date').value||today(), notes=$('s-notes').value.trim();
+  if(!stake){alert('Please enter a stake');return;}
+  if(isNaN(buyin)||buyin<=0){alert('Please enter a valid buy-in');return;}
+  if(isNaN(cashout)||cashout<0){alert('Please enter a valid cash-out');return;}
+
+  const session={id:uid(),stake,buyin,cashout,hours,location,date,notes,profit:cashout-buyin,createdAt:Date.now()};
+
+  // Optimistic update
+  store.sessions.unshift(session);
+  store.bankroll += session.profit;
+  renderSessionsTable(); updateHeaderBankroll(); renderDashboard();
+
+  // Reset form
+  ['s-stake','s-buyin','s-cashout','s-hours','s-location','s-notes'].forEach(id=>$(id).value='');
+  $('s-date').value=''; $('s-preview').textContent='';
+  document.querySelectorAll('#stake-presets .chip').forEach(c=>c.classList.remove('sel'));
+
+  // Sync to Sheets
+  setSaving();
+  try {
+    const r = await api('addSession', { data: session });
+    store.bankroll = r.bankroll; // use server's authoritative bankroll
+    localStorage.setItem('pk_sessions_cache', JSON.stringify(store.sessions));
+    localStorage.setItem('pk_bankroll', String(store.bankroll));
+    setSaved(); updateHeaderBankroll();
+  } catch(e){ setSyncErr(); }
+}
+
+async function deleteSession(id){
+  const sess = store.sessions.find(s=>s.id===id);
+  if(!sess) return;
+  confirmAction(async () => {
+    // Optimistic
+    store.sessions = store.sessions.filter(s=>s.id!==id);
+    store.bankroll -= sess.profit;
+    renderSessionsTable(); renderDashboard(); updateHeaderBankroll();
+    setSaving();
+    try {
+      const r = await api('deleteSession', { id });
+      store.bankroll = r.bankroll;
+      localStorage.setItem('pk_sessions_cache', JSON.stringify(store.sessions));
+      localStorage.setItem('pk_bankroll', String(store.bankroll));
+      setSaved(); updateHeaderBankroll();
+    } catch(e){ setSyncErr(); }
+  });
+}
+
+function renderSessionsTable(){
+  const ss=store.sessions;
+  $('session-count').textContent=ss.length+' session'+(ss.length!==1?'s':'');
+  if(!ss.length){ $('sessions-tbody').innerHTML=''; $('sessions-empty').style.display='block'; return; }
+  $('sessions-empty').style.display='none';
+  $('sessions-tbody').innerHTML=ss.map(s=>{
+    const cls=s.profit>=0?'pos':'neg';
+    const hr=(s.hours&&s.hours>0)?(s.profit/s.hours).toFixed(0):null;
+    return `<tr>
+      <td style="color:var(--muted)">${fmtDate(s.date)}</td>
+      <td><span class="badge badge-gold">${s.stake}</span></td>
+      <td>${s.location||'<span style="color:var(--muted)">—</span>'}</td>
+      <td>${fmtMoney(s.buyin)}</td><td>${fmtMoney(s.cashout)}</td>
+      <td><strong class="${cls}">${fmt(s.profit)}</strong></td>
+      <td>${s.hours?s.hours+'h':'—'}</td>
+      <td>${hr!==null?`<span class="${s.profit>=0?'pos':'neg'}">$${Math.abs(hr)}/hr</span>`:'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteSession('${s.id}')">✕</button></td></tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════
+   HANDS
+   ═══════════════════════════════════════════════════════ */
+
+function selectHandType(t){
+  handType=t;
+  $('hand-type-win').classList.toggle('active',t==='win');
+  $('hand-type-lose').classList.toggle('active',t==='lose');
+}
+
+async function logHand(){
+  const amount=parseFloat($('h-amount').value);
+  const stake=$('h-stake').value.trim(), date=$('h-date').value||today();
+  const villain=$('h-villain').value.trim(), desc=$('h-desc').value.trim(), lesson=$('h-lesson').value.trim();
+  const preflop=$('a-preflop').value.trim(), flop=$('a-flop').value.trim();
+  const turn=$('a-turn').value.trim(), river=$('a-river').value.trim();
+
+  if(isNaN(amount)||amount<=0){alert('Please enter a valid amount');return;}
+  if(!preflop&&!desc){alert('Please describe the preflop action or add a hand summary');return;}
+
+  const hand={
+    id:uid(), type:handType, amount, stake, date, villain, desc, lesson,
+    cards:{ hole:cardSel.hole.filter(Boolean), flop:cardSel.flop.filter(Boolean),
+            turn:cardSel.turn.filter(Boolean), river:cardSel.river.filter(Boolean) },
+    actions:{preflop,flop,turn,river},
+    createdAt:Date.now()
+  };
+
+  // Optimistic
+  store.hands.unshift(hand);
+  renderHands();
+
+  // Reset
+  ['h-amount','h-stake','h-villain','h-desc','h-lesson','a-preflop','a-flop','a-turn','a-river'].forEach(id=>$(id).value='');
+  $('h-date').value='';
+  cardSel={hole:[null,null],flop:[null,null,null],turn:[null],river:[null]};
+  renderCardSlots(); selectHandType('win');
+
+  setSaving();
+  try {
+    await api('addHand', { data: hand });
+    localStorage.setItem('pk_hands_cache', JSON.stringify(store.hands));
+    setSaved();
+  } catch(e){ setSyncErr(); }
+}
+
+async function deleteHand(id){
+  confirmAction(async () => {
+    store.hands = store.hands.filter(h=>h.id!==id);
+    renderHands();
+    setSaving();
+    try { await api('deleteHand', { id }); localStorage.setItem('pk_hands_cache',JSON.stringify(store.hands)); setSaved(); }
+    catch(e){ setSyncErr(); }
+  });
+}
+
+function filterHands(f){
+  handFilter=f;
+  ['all','win','lose'].forEach(t=>{ const el=$('filter-'+t); el&&el.classList.toggle('sel',t===f); });
+  renderHands();
+}
+
+function renderHands(){
+  let hands=store.hands;
+  if(handFilter!=='all') hands=hands.filter(h=>h.type===handFilter);
+  const c=$('hands-list');
+  if(!hands.length){ c.innerHTML=''; $('hands-empty').style.display='block'; return; }
+  $('hands-empty').style.display='none';
+  c.innerHTML=hands.map(h=>{
+    const cards=h.cards||{};
+    const hole=cards.hole||[],flop=cards.flop||[],turn=cards.turn||[],river=cards.river||[];
+    let boardHTML='';
+    if(hole.length||flop.length||turn.length||river.length){
+      boardHTML='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+      if(hole.length){ boardHTML+=`<span style="font-size:.7rem;color:var(--muted)">Hero:</span>`+hole.map(c=>miniCardHTML(c)).join(''); }
+      if(flop.length){ if(hole.length) boardHTML+='<div class="board-divider"></div>'; boardHTML+=`<span style="font-size:.7rem;color:var(--muted)">Flop:</span>`+flop.map(c=>miniCardHTML(c)).join(''); }
+      if(turn.length){ boardHTML+=`<span style="font-size:.7rem;color:var(--muted);margin:0 2px">Turn:</span>`+turn.map(c=>miniCardHTML(c)).join(''); }
+      if(river.length){ boardHTML+=`<span style="font-size:.7rem;color:var(--muted);margin:0 2px">River:</span>`+river.map(c=>miniCardHTML(c)).join(''); }
+      boardHTML+='</div>';
+    }
+    const actions=h.actions||{};
+    const streets=[{l:'Preflop',k:'preflop',bd:[]},{l:'Flop',k:'flop',bd:flop},{l:'Turn',k:'turn',bd:turn},{l:'River',k:'river',bd:river}];
+    let streetsHTML='';
+    if(streets.some(s=>actions[s.k])){
+      streetsHTML='<div class="hand-streets">';
+      streets.forEach(s=>{ if(!actions[s.k]) return;
+        const bc=s.bd.length?s.bd.map(c=>miniCardHTML(c,'22px','30px')).join(''):'';
+        streetsHTML+=`<div class="street-entry"><div class="s-label">${s.l}${bc?` — <span style="display:flex;gap:3px">${bc}</span>`:''}</div><div class="s-text">${actions[s.k]}</div></div>`; });
+      streetsHTML+='</div>';
+    }
+    return `<div class="hand-card">
+      <button class="del-btn" onclick="deleteHand('${h.id}')">✕</button>
+      <div class="top">
+        <span class="badge ${h.type==='win'?'badge-win':'badge-lose'}">${h.type==='win'?'🏆 WIN':'💔 LOSS'}</span>
+        <span class="amount ${h.type==='win'?'pos':'neg'}">${h.type==='win'?'+':'-'}$${h.amount.toLocaleString()}</span>
+        ${h.stake?`<span class="badge badge-gold">${h.stake}</span>`:''}
+        ${h.villain?`<span style="font-size:.8rem;color:var(--muted)">vs. ${h.villain}</span>`:''}
+      </div>
+      ${boardHTML}${streetsHTML}
+      ${h.desc?`<div class="hand-body" style="margin-top:${streetsHTML?'12':'0'}px">${h.desc}</div>`:''}
+      ${h.lesson?`<div style="margin-top:10px;padding:10px;background:var(--bg2);border-radius:6px;border-left:3px solid var(--gold)">
+        <div style="font-size:.7rem;color:var(--gold);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">💡 Lesson</div>
+        <div style="font-size:.85rem;color:var(--muted)">${h.lesson}</div></div>`:''}
+      <div class="meta"><span>📅 ${fmtDate(h.date)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════════════════════ */
+
+function renderDashboard(){
+  checkLocalRecovery();
+  const ss=store.sessions, bankroll=store.bankroll;
+  const totalProfit=ss.reduce((a,s)=>a+s.profit,0);
+  const wins=ss.filter(s=>s.profit>0), losses=ss.filter(s=>s.profit<0);
+  const winRate=ss.length?((wins.length/ss.length)*100).toFixed(0):0;
+  const totalHours=ss.reduce((a,s)=>a+(s.hours||0),0);
+  const hourlyRate=totalHours>0?(totalProfit/totalHours).toFixed(0):null;
+  const biggestWin=wins.length?Math.max(...wins.map(s=>s.profit)):0;
+  const biggestLoss=losses.length?Math.min(...losses.map(s=>s.profit)):0;
+
+  $('stat-grid').innerHTML=`
+    <div class="stat-card"><div class="label">Bankroll</div><div class="value ${bankroll>=0?'pos':'neg'}">${bankroll>=0?'$':'-$'}${Math.abs(bankroll).toLocaleString()}</div><div class="sub">Lifetime tracking</div></div>
+    <div class="stat-card"><div class="label">Total P&L</div><div class="value ${totalProfit>=0?'pos':'neg'}">${fmt(totalProfit)}</div><div class="sub">${ss.length} sessions</div></div>
+    <div class="stat-card"><div class="label">Win Rate</div><div class="value neutral">${winRate}%</div><div class="progress-bar"><div class="progress-fill" style="width:${winRate}%;background:${winRate>=50?'var(--green)':'var(--red)'}"></div></div></div>
+    <div class="stat-card"><div class="label">Hourly Rate</div><div class="value ${hourlyRate!==null&&hourlyRate>=0?'pos':'neg'}">${hourlyRate!==null?fmt(Number(hourlyRate))+'/hr':'—'}</div><div class="sub">${totalHours.toFixed(1)} total hours</div></div>
+    <div class="stat-card"><div class="label">Biggest Win</div><div class="value pos">${biggestWin?fmt(biggestWin):'—'}</div></div>
+    <div class="stat-card"><div class="label">Biggest Loss</div><div class="value neg">${biggestLoss?fmt(biggestLoss):'—'}</div></div>`;
+
+  updateHeaderBankroll();
+
+  $('recent-sessions-list').innerHTML=!ss.length
+    ?'<div class="empty"><div class="icon">🃏</div>No sessions yet</div>'
+    :ss.slice(0,5).map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div><div style="font-size:.875rem">${fmtDate(s.date)} <span class="badge badge-gold" style="margin-left:4px">${s.stake}</span></div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:2px">${s.location||'No location'}</div></div>
+        <strong class="${s.profit>=0?'pos':'neg'}">${fmt(s.profit)}</strong></div>`).join('');
+
+  $('recent-hands-list').innerHTML=!store.hands.length
+    ?'<div class="empty"><div class="icon">✋</div>No hands saved</div>'
+    :store.hands.slice(0,4).map(h=>{
+      const hole=(h.cards&&h.cards.hole)||[];
+      const cs=hole.length?hole.map(c=>c.rank+c.suit).join(' '):'';
+      const preview=h.actions&&h.actions.preflop||h.desc||'';
+      return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span class="badge ${h.type==='win'?'badge-win':'badge-lose'}" style="white-space:nowrap;margin-top:2px">${h.type==='win'?'🏆':'💔'}</span>
+        <div><div style="font-size:.875rem" class="${h.type==='win'?'pos':'neg'}">${h.type==='win'?'+':'-'}$${h.amount.toLocaleString()}${cs?` <span style="color:var(--purple);font-size:.8rem">[${cs}]</span>`:''}</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:2px">${preview.slice(0,60)}${preview.length>60?'…':''}</div></div></div>`;
+    }).join('');
+
+  renderDashChart();
+}
+
+function renderDashChart(){
+  const sorted=[...store.sessions].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let r=0; const labels=['Start'], values=[0];
+  sorted.forEach(s=>{ r+=s.profit; labels.push(fmtDate(s.date)); values.push(r); });
+  if(charts.dash) charts.dash.destroy();
+  const color=values[values.length-1]>=0?'#3fb950':'#f85149';
+  charts.dash=new Chart($('dash-chart').getContext('2d'),{type:'line',
+    data:{labels,datasets:[{data:values,borderColor:color,backgroundColor:color+'20',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:color}]},
+    options:chartOptions()});
+}
+
+function updateHeaderBankroll(){
+  const b=store.bankroll;
+  $('header-bankroll').innerHTML=`Bankroll: <strong style="color:${b>=0?'var(--green)':'var(--red)'}">${b>=0?'$':'-$'}${Math.abs(b).toLocaleString()}</strong>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   ANALYTICS
+   ═══════════════════════════════════════════════════════ */
+
+function renderAnalytics(){
+  const ss=store.sessions;
+  const totalProfit=ss.reduce((a,s)=>a+s.profit,0);
+  const wins=ss.filter(s=>s.profit>0), losses=ss.filter(s=>s.profit<=0);
+  const totalHours=ss.reduce((a,s)=>a+(s.hours||0),0);
+  const avgSession=ss.length?(totalProfit/ss.length).toFixed(0):0;
+  const hourlyRate=totalHours>0?(totalProfit/totalHours).toFixed(0):null;
+
+  $('analytics-stats').innerHTML=`
+    <div class="stat-card"><div class="label">Total Sessions</div><div class="value neutral">${ss.length}</div><div class="sub">${wins.length} wins · ${losses.length} losses</div></div>
+    <div class="stat-card"><div class="label">Avg Session</div><div class="value ${avgSession>=0?'pos':'neg'}">${fmt(Number(avgSession))}</div></div>
+    <div class="stat-card"><div class="label">Hourly Rate</div><div class="value ${hourlyRate!==null&&hourlyRate>=0?'pos':'neg'}">${hourlyRate!==null?fmt(Number(hourlyRate))+'/hr':'—'}</div><div class="sub">${totalHours.toFixed(1)}h played</div></div>
+    <div class="stat-card"><div class="label">Hands Logged</div><div class="value neutral">${store.hands.length}</div><div class="sub">${store.hands.filter(h=>h.type==='win').length} wins · ${store.hands.filter(h=>h.type==='lose').length} losses</div></div>`;
+
+  // PL chart
+  const sorted=[...ss].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let r=0; const pl_labels=['Start'],pl_vals=[0];
+  sorted.forEach(s=>{ r+=s.profit; pl_labels.push(fmtDate(s.date)); pl_vals.push(r); });
+  const plColor=pl_vals[pl_vals.length-1]>=0?'#3fb950':'#f85149';
+  if(charts.pl) charts.pl.destroy();
+  charts.pl=new Chart($('pl-chart').getContext('2d'),{type:'line',data:{labels:pl_labels,datasets:[{data:pl_vals,borderColor:plColor,backgroundColor:plColor+'20',fill:true,tension:.3,pointRadius:3,pointBackgroundColor:plColor}]},options:chartOptions()});
+
+  // Stake chart
+  const stakeMap={}; ss.forEach(s=>{ if(!stakeMap[s.stake])stakeMap[s.stake]=0; stakeMap[s.stake]+=s.profit; });
+  const stLabels=Object.keys(stakeMap),stVals=Object.values(stakeMap);
+  if(charts.stake) charts.stake.destroy();
+  if(stLabels.length) charts.stake=new Chart($('stake-chart').getContext('2d'),{type:'bar',data:{labels:stLabels,datasets:[{data:stVals,backgroundColor:stVals.map(v=>v>=0?'#3fb950':'#f85149'),borderRadius:6}]},options:{...chartOptions(),plugins:{legend:{display:false}}}});
+
+  // Duration chart
+  const b={'<2h':0,'2-4h':0,'4-6h':0,'6-8h':0,'8h+':0};
+  ss.forEach(s=>{ if(!s.hours)return; if(s.hours<2)b['<2h']++; else if(s.hours<4)b['2-4h']++; else if(s.hours<6)b['4-6h']++; else if(s.hours<8)b['6-8h']++; else b['8h+']++ });
+  if(charts.dur) charts.dur.destroy();
+  charts.dur=new Chart($('duration-chart').getContext('2d'),{type:'bar',data:{labels:Object.keys(b),datasets:[{data:Object.values(b),backgroundColor:'#58a6ff',borderRadius:6}]},options:{...chartOptions(),plugins:{legend:{display:false}}}});
+
+  // Win/Loss donut
+  if(charts.wl) charts.wl.destroy();
+  if(wins.length||losses.length) charts.wl=new Chart($('winloss-chart').getContext('2d'),{type:'doughnut',data:{labels:['Winning','Losing'],datasets:[{data:[wins.length,losses.length],backgroundColor:['#3fb950','#f85149'],borderColor:'#21262d',borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8b949e',padding:16,font:{size:12}}}}}});
+
+  // Location table
+  const locs={}; ss.forEach(s=>{ const k=s.location||'Unknown'; if(!locs[k])locs[k]={sessions:0,profit:0,wins:0}; locs[k].sessions++; locs[k].profit+=s.profit; if(s.profit>0)locs[k].wins++; });
+  const entries=Object.entries(locs).sort((a,b)=>b[1].profit-a[1].profit);
+  if(!entries.length){ $('location-empty').style.display='block'; $('location-table-content').style.display='none'; return; }
+  $('location-empty').style.display='none'; $('location-table-content').style.display='block';
+  $('location-tbody').innerHTML=entries.map(([loc,d])=>`<tr><td>${loc}</td><td>${d.sessions}</td>
+    <td><strong class="${d.profit>=0?'pos':'neg'}">${fmt(d.profit)}</strong></td>
+    <td class="${(d.profit/d.sessions)>=0?'pos':'neg'}">${fmt(Math.round(d.profit/d.sessions))}</td>
+    <td>${((d.wins/d.sessions)*100).toFixed(0)}%</td></tr>`).join('');
+}
+
+function chartOptions(){
+  return{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+    tooltip:{backgroundColor:'#21262d',borderColor:'#30363d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#8b949e',callbacks:{label:ctx=>' $'+ctx.raw.toLocaleString()}}},
+    scales:{x:{grid:{color:'#21262d'},ticks:{color:'#8b949e',font:{size:11}}},
+            y:{grid:{color:'#21262d'},ticks:{color:'#8b949e',font:{size:11},callback:v=>'$'+v.toLocaleString()}}}};
+}
+
+/* ═══════════════════════════════════════════════════════
+   CONFIRM DIALOG
+   ═══════════════════════════════════════════════════════ */
+
+function confirmAction(cb){
+  $('confirm-overlay').classList.add('show');
+  $('confirm-yes').onclick=()=>{ closeConfirm(); cb(); };
+}
+function closeConfirm(){ $('confirm-overlay').classList.remove('show'); }
+
+/* ═══════════════════════════════════════════════════════
+   RENDER ALL
+   ═══════════════════════════════════════════════════════ */
+
+function renderAll(){
+  renderDashboard();
+  renderSessionsTable();
+  renderHands();
+}
+
+/* ═══════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════ */
+
+$('s-date').value = today();
+$('h-date').value = today();
+cardSel = { hole:[null,null], flop:[null,null,null], turn:[null], river:[null] };
+renderCardSlots();
+boot();
+</script>
+</body>
+</html>
